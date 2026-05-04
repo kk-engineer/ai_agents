@@ -1,0 +1,11 @@
+[theme]
+# Meta Blue - This will change your buttons/links to blue
+primaryColor = "#0866FF"
+
+# White background
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F0F2F6"
+textColor = "#31333F"
+
+# Font options are ONLY "sans serif", "serif", or "monospace"
+font = "serif"

@@ -1,0 +1,12 @@
+# Virtual Environments
+.venv/
+.idea/
+venv/
+
+# Environment files
+.env
+
+# Databases
+*.sqlite3
+*db*
+db.sqlite3
