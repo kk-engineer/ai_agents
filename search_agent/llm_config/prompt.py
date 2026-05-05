@@ -1,65 +1,73 @@
+import os
 from datetime import datetime
 from langchain_core.prompts import PromptTemplate
 
-# Injecting the current date is CRITICAL for search relevance
-current_date = datetime.now().strftime("%A, %B %d, %Y")
+def load_md_file(filename):
+    path = f"config/{filename}"
+    if os.path.exists(path):
+        with open(path, "r") as f:
+            # We escape any existing curly braces in your markdown files
+            # so they don't break the LangChain parser
+            return f.read().replace("{", "{{").replace("}", "}}")
+    return "No context provided."
 
-template = f"""You are a smart and helpful AI assistant.
-Today's Date is: {current_date}
-Answer the user's question as best you can. You can use the following tools:
+def get_agent_prompt():
+    current_date = datetime.now().strftime("%A, %B %d, %Y")
 
-{{tools}}
+    # 1. Define the RAW template string (NO f-string here)
+    # We use single braces {input} for things LangChain must fill later
+    template = """
+{soul}
+{agent_rules}
+{user_context}
 
-Use the following format EXACTLY:
+Answer the user's question using the following tools:
+{tools}
 
-Question: the input question you must answer
-Thought: you should always think about what to do
-Action: the action to take, should be one of [{{tool_names}}]
-Action Input: the input to the action
-Observation: the result of the action
-... (this Thought/Action/Action Input/Observation can repeat N times)
-Thought: I now know the final answer
-Final Answer: the final answer to the original input question
+STRICT RESPONSE FORMAT:
+Question: {input}
+Thought: I should determine if I need a tool or can answer directly.
+Action: [{tool_names}] (ONLY if needed)
+Action Input: [input] (ONLY if needed)
+Observation: [tool_output]
+... (repeat if needed)
+Thought: I now have the answer.
+Final Answer: [your final response to the user]
 
+EXAMPLES OF CORRECT FORMAT:
+Question: Hi
+Thought: The user is greeting me. I don't need a tool.
+Final Answer: Hello! I am RoboSathi, your AI assistant. How can I help you today?
 
-IMPORTANT RULES:
-- If you don't need a tool, you MUST NOT provide an Action. Instead, provide 'Final Answer:' immediately after your Thought.
-- Every Thought must be followed by either an Action: or a Final Answer:
-- If the question is about latest event, such as, weather, dates, or news, etc, for which you need to search the web, then you MUST use duckduckgo_search.
-- Do not apologize. Do not tell the user to check other websites. If you do not have the information, you MUST use the search tool provided.
-- If you cannot find the info, DO NOT suggest external websites. Use the search tool again with different keywords.
-- If you don't need a tool, skip Action/Action Input and go straight to Final Answer.
-- Respond ONLY in the specified ReAct format. No greetings, no preamble.
+Question: Weather in Pune?
+Thought: I need real-time data. I will use the search tool.
+Action: duckduckgo_search
+Action Input: weather in Pune
+Observation: Current temperature in Pune is 31°C and sunny.
+Thought: I have the information needed to answer.
+Final Answer: The current weather in Pune is 31°C and sunny.
 
-STRICT RULES:
-1. Today is {current_date}. Give the results available, closest to this day, unless stated explicitly for a particular date.
-2. If you cannot find the exact real-time latest results after searching, describe the most recent results you found.
-3. NEVER loop more than 2 times for the same data. If you can't find it, tell the user whatever you found and where they can check (e.g., "I couldn't find the live score, but I see PBKS played GT yesterday.")
-4. You are running on macOS. Use Mac-compatible bash commands (e.g., 'df -h', 'sw_vers').
-5. NEVER use commands that delete or modify files (no 'rm', 'rf', 'mv' into trash).
-6. DO NOT wrap commands in brackets []; DO NOT return Python lists; ONLY return raw string commands;
-7. ALWAYS limit terminal output using `head -n 10`; NEVER return full command output.
-8. By default, commands run in the current directory.
-9. If the user asks about "entire system", "whole disk", or "all files", you MUST use root path "/"; 
-Use commands like:
-  - du -ah / | sort -rh | head -n 20  (largest files/folders)
-  - df -h  (disk usage)
-- Avoid permission errors by redirecting stderr: 2>/dev/null
-
-
-[SYSTEM DIAGNOSTIC PROTOCOL]
-When asked for specs, you MUST execute this EXACT multi-command in ONE action:
-sw_vers -productVersion; system_profiler SPHardwareDataType | grep -E "Model Name|Chip|Memory"; system_profiler SPDisplaysDataType | grep "Chipset Model"; df -H /System/Volumes/Data | head -n 2; 
-system_profiler SPHardwareDataType | grep -E "Total Number of Cores"; system_profiler SPDisplaysDataType | grep -E "Total Number of Cores"
-
-[FINAL ANSWER RULES]
-- Once you see the output of the combined commands, you MUST immediately provide the Final Answer.
-- Do not perform additional thoughts or repeat the commands.
+Today's Date: {current_date}
+Memory: {memory}
 
 Chat History:
-{{chat_history}}
+{chat_history}
 
-Question: {{input}}
-{{agent_scratchpad}}"""
+Question: {input}
+Thought: {agent_scratchpad}"""
 
-prompt = PromptTemplate.from_template(template)
+    # 2. Create the PromptTemplate with partial_variables
+    # This "bakes in" the file content and date so you don't need to pass them in main.py
+    return PromptTemplate(
+        template=template,
+        input_variables=["input", "chat_history", "agent_scratchpad", "tools", "tool_names"],
+        partial_variables={
+            "soul": load_md_file("soul.md"),
+            "agent_rules": load_md_file("agent.md"),
+            "user_context": load_md_file("user.md"),
+            "memory": load_md_file("memory.md"),
+            "current_date": current_date,
+        }
+    )
+
+prompt = get_agent_prompt()

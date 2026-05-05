@@ -1,4 +1,5 @@
 import streamlit as st
+import time
 from langchain_classic.agents import AgentExecutor, create_react_agent
 
 # Local imports
@@ -9,42 +10,42 @@ from tools.search_duckduckgo import get_duckduckgo_search_tool
 from tools.search_tavily import get_tavily_tool
 from tools.terminal_tool import get_terminal_tool
 
-# -------------------------------
-# 1. LLM Config
-# -------------------------------
-# Toggle this based on your current workspace/battery/internet
-USE_LOCAL = True
-
-if USE_LOCAL:
-    llm = get_ollama_llm()
-else:
-    llm = get_cloud_llm()
-
-# -------------------------------
-# 2. Tools
-# -------------------------------
+USE_LOCAL_LLM = True
 USE_DUCKDUCKGO = True
+llm = None
 
-if USE_DUCKDUCKGO:
-    search = get_duckduckgo_search_tool()
-else:
-    search = get_tavily_tool()
+@st.cache_resource
+def initialize_app():
+    # -------------------------------
+    # 1. LLM Config
+    # -------------------------------
+    # Toggle this based on your current workspace/battery/internet
+    llm = get_ollama_llm() if USE_LOCAL_LLM else get_cloud_llm()
 
-terminal = get_terminal_tool()
-tools = [search, terminal]
+    # -------------------------------
+    # 2. Tools
+    # -------------------------------
+    web_search = get_duckduckgo_search_tool() if USE_DUCKDUCKGO else get_tavily_tool()
+    terminal = get_terminal_tool()
 
-# -------------------------------
-# 3. Agent & Executor
-# -------------------------------
-agent = create_react_agent(llm, tools, prompt)
+    tools = [web_search, terminal]
 
-agent_executor = AgentExecutor(
-    agent=agent,
-    tools=tools,
-    verbose=True,
-    handle_parsing_errors=True,  # This catches the error and asks the LLM to fix it
-    max_iterations=3
-)
+    # -------------------------------
+    # 3. Agent & Executor
+    # -------------------------------
+    agent = create_react_agent(llm, tools, prompt)
+
+    agent_executor = AgentExecutor(
+        agent=agent,
+        tools=tools,
+        verbose=True,
+        handle_parsing_errors=True,  # This catches the error and asks the LLM to fix it
+        max_iterations=2
+    )
+
+    return agent_executor, llm
+
+agent_executor, llm = initialize_app()
 
 # -------------------------------
 # 4. UI & Config
@@ -71,6 +72,10 @@ st.markdown("""
 # -------------------------------
 # 5. UI Loop
 # -------------------------------
+
+def is_simple_greeting(text):
+    greetings = ["hi", "hello", "hey", "who are you", "thanks", "bye", "what's up"]
+    return text.lower().strip() in greetings
 
 # ---  SESSION STATE MANAGEMENT ---
 if "processing" not in st.session_state:
@@ -101,25 +106,33 @@ if st.session_state.processing:
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             try:
+                # 1. Start the timer
+                start_time = time.time()
                 # Format simple history string for the prompt
-                history_str = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-5:-1]])
+                history_str = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-2:]])
 
-                # Assume agent_executor is defined in your backend setup
-                response = agent_executor.invoke({
-                   "input": current_prompt,
-                   "chat_history": history_str
-                })
-                output = response["output"]
+                if is_simple_greeting(current_prompt):
+                    # Call the LLM directly without the ReAct overhead
+                    response_text = llm.invoke(f"The user said '{current_prompt}'. Give a short, friendly greeting.")
+                    output = response_text.content
+                else:
+                    # Use the full Agent for complex tasks
+                    response = agent_executor.invoke({"input": current_prompt, "chat_history": history_str})
+                    output = response["output"]
+                # 2. Calculate elapsed time
+                end_time = time.time()
+                elapsed_time = round(end_time - start_time, 2)
 
-                # Simulation for demonstration
-                #output = f"Processed: {current_prompt}"
+                # 3. Append the time to the output string
+                output_with_time = f"{output}\n\n---\n*⏱️ Response time: {elapsed_time} seconds*"
 
             except Exception as e:
-                output = f"I encountered an error: {str(e)}"
+                output_with_time = f"I encountered an error: {str(e)}"
 
-            st.markdown(output)
-            st.session_state.messages.append({"role": "assistant", "content": output})
+            st.markdown(output_with_time)
+            # Save the version with the timestamp to session state
+            st.session_state.messages.append({"role": "assistant", "content": output_with_time})
 
-    # Unlock the input
-    st.session_state.processing = False
-    st.rerun()
+        # Unlock the input
+        st.session_state.processing = False
+        st.rerun()
