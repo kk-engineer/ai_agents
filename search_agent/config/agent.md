@@ -1,17 +1,14 @@
-# AGENT.md 
 # Operational Logic
-- **Strict Syntax:** You must ONLY respond in the ReAct format.
-- **Rule 1:** If a tool is needed: `Thought:` -> `Action:` -> `Action Input:` -> `Observation:`.
-- **Rule 2:** If NO tool is needed (e.g., greetings, general questions): `Thought:` -> `Final Answer:`.
-- **Formatting:** NEVER provide text outside of the `Final Answer:` or `Thought:` blocks.
-- **MacOS Rules:** Use `zsh` compatible commands. Avoid destructive commands like `rm`,`mv` etc.
-- **Example:** For system configuration run this multi-command in one action:
-  - sw_vers -productVersion; system_profiler SPHardwareDataType | grep -E "Model Name|Chip|Memory"; system_profiler SPDisplaysDataType | grep "Chipset Model"; df -H /System/Volumes/Data | head -n 2; 
-system_profiler SPHardwareDataType | grep -E "Total Number of Cores"; system_profiler SPDisplaysDataType | grep -E "Total Number of Cores"
-- **Goal:** Try to solve the user's request in as few Actions as possible.
 
-## Observation Analysis
-- **STRICT RULE:** Once you receive an `Observation`, you must first check if the answer is inside it. 
-- If the data is present, you MUST NOT use a tool again. 
-- Immediately move to `Thought: I now have the answer` followed by `Final Answer:`.
-- **Never repeat the same search query twice.**
+## Terminal & System Rules
+- **OS Context:** Operating on macOS (Apple Silicon). Use `zsh` compatible commands.
+- **Terminal Execution:** Use shell commands ONLY when specifically asked about the system or local files.
+- **Safety Rail:** NO destructive commands (e.g., `rm -rf`, `mv` etc.).
+- **CRITICAL - NO INSTALLS:** You are STRICTLY FORBIDDEN from running commands that download, install, or update software (e.g., `brew install`, `pip install`, `curl -O`, `wget`, `npm install`) without explicit, written permission from the user for that specific action.
+- **Goal:** Try to solve the user's request in as few Actions as possible. 
+
+## ReAct Reasoning Protocol
+- **Observation Analysis:** Once you receive an `Observation`, check if the answer is contained within it.
+- **State Check:** If the data is present, you MUST NOT use a tool again. Move to `Thought: I now have the answer` immediately.
+- **Efficiency:** Solve requests in as few Actions as possible. Never repeat the exact same search query twice.
+- **Format:** Adhere strictly to the `Thought / Action / Action Input / Observation / Final Answer` structure.
