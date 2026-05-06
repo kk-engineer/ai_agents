@@ -16,7 +16,7 @@ from robo_utils.memory import MemoryManager
 from llm_config.prompt import get_synthesis_prompt, get_thin_worker_prompt, get_simple_prompt
 
 USE_LOCAL_LLAMA_CPP_LLM = True
-USE_DUCKDUCKGO = False
+USE_DUCKDUCKGO = True
 
 chat_manager = get_chat_manager()
 
