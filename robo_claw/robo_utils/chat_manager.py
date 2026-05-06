@@ -8,6 +8,10 @@ class ChatManager:
     def add_message(self, role, content):
         self.history.append({"role": role, "content": content})
 
+    def get_messages(self):
+        """Returns the history as a standard list of dictionaries."""
+        return list(self.history)
+
     def get_as_string(self):
         # Formats for the Chat History section of your prompt
         return "\n".join([f"{m['role'].capitalize()}: {m['content']}" for m in self.history])

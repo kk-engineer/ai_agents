@@ -34,9 +34,9 @@ def run_cli():
 
             start_time = time.time()
 
-            # 3. Spinner: dots is more reliable than simpleDots in many terminals
-            #with console.status("[magenta]Thinking...", spinner="dots"):
-            with console.status("[magenta]Thinking...", spinner="progress_bar"):
+            # 3. Spinner: dots is more reliable than simpleDots in many terminal
+            #with console.status("[magenta]Thinking...", spinner="progress_bar"):
+            with console.status("[magenta]Thinking...", spinner="dots"):
                 output = call_agent(user_query)
 
             elapsed_time = round(time.time() - start_time, 2)
@@ -46,7 +46,7 @@ def run_cli():
                 title="RoboSathi",
                 border_style="blue"
             ))
-            console.print(f"⏱️ {elapsed_time}s", style="dim")
+            console.print(f"⏱️  {elapsed_time}s", style="dim")
             #chat_history.append({"role": "assistant", "content": output})
 
         except KeyboardInterrupt:

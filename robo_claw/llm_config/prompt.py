@@ -25,6 +25,9 @@ def get_synthesis_prompt():
     
     Chat History:
     {chat_history}
+    
+    ### LONG-TERM MEMORY (Persistent)
+    {persistent_memory}
 
     User Question: {input}
     
@@ -49,25 +52,29 @@ def get_synthesis_prompt():
 
 
 # Check if simple prompt and does not need agent for execution
-def get_simple_prompt():
+def get_simple_prompt(persistent_memory="No memory available."):
     simple_prompt = ChatPromptTemplate.from_template(
         "### INSTRUCTION\n"
-        "Categorize the User Input as 'SIMPLE' or 'TOOL' based on the following safety guardrails.\n\n"
+        "You are a router for an AI assistant. Analyze the User Input and categorize it.\n\n"
+        "### AVAILABLE CONTEXT (Persistent Memory)\n"
+        f"{persistent_memory}\n\n"
+        "### CATEGORIES\n"
+        "1. 'SIMPLE': The answer is ALREADY present in the Persistent Memory above, OR"
+        "it is a Social greetings or general knowledge or a request for a static definition that doesn't need fresh data.\n\n"
+        "2. 'MEMORY': If the user explicitly asks to 'remember', 'save', or 'store' something.\n"
+        "3. 'TOOL': If the input requires terminal access, web search, or real-time data.\n"
         "### GUARDRAIL 1: DATA FRESHNESS\n"
         "If the input mentions system configuration, weather, or time-sensitive facts (latest, update, news etc.), "
         "you MUST respond 'TOOL'. Your internal training data is considered STALE for these topics.\n\n"
         "### GUARDRAIL 2: THE HALLUCINATION TRAP\n"
         "If the user asks 'What is my [X]?', you DO NOT know the answer. Even if it is in your context, "
         "you MUST select 'TOOL' to verify the current state. Do not rely on static summaries.\n\n"
-        "### GUARDRAIL 3: COMPLEXITY\n"
-        "Categorize as 'SIMPLE' if the response is a social convention, a greeting, "
-        "or a request for a static definition (e.g., 'What is a variable?').\n\n"
         "User Input: {text}\n"
-        "Response (ONLY 'SIMPLE' or 'TOOL'):"
+        "Response (Output ONLY the word 'SIMPLE', 'TOOL', or 'MEMORY'):"
     )
     return simple_prompt
 
-def get_thin_worker_prompt():
+def get_thin_worker_prompt(persistent_memory="No long-term memory provided."):
     # NO Soul, NO User context, NO History. Just tools.
     template = """Answer the following questions as best you can. 
     Yo have access to below tools :
@@ -75,13 +82,16 @@ def get_thin_worker_prompt():
     
     Today's Date: {current_date}
     
+    ### SELECTIVE MEMORY (Relevant Facts)
+    {persistent_memory}
+    
     STRICT RESPONSE FORMAT:
     Question: the input question you must answer
     Thought: I should determine if I need a tool or can answer directly.
     Action: the action to take, should be one of [{tool_names}]
     Action Input: the specific string input for the tool
     Observation: Actual data returned by the tool.
-    ... (this Thought/Action/Action Input/Observation can repeat N times)
+    ... (can repeat N times)
     Thought: I will now synthesize the Observation into a helpful response.
     Final Answer: A detailed answer based EXACTLY on the Observation.
     
@@ -89,7 +99,10 @@ def get_thin_worker_prompt():
     1. For terminal tool system configuration, run this multi-command in one action:
     sw_vers -productVersion; system_profiler SPHardwareDataType | grep -E "Model Name|Chip|Memory"; system_profiler SPDisplaysDataType | grep "Chipset Model"; df -H /System/Volumes/Data | head -n 2; 
     system_profiler SPHardwareDataType | grep -E "Total Number of Cores"; system_profiler SPDisplaysDataType | grep -E "Total Number of Cores"
-    2. **INSTALLATION LOCK:** 
+    2. **SELECTIVE MEMORY RULE:** 
+       - ONLY use the 'remember_info' tool if the user explicitly asks to 'remember', 'save', or 'store' a fact. 
+       - Do not auto-save every conversation.
+    3. **INSTALLATION LOCK:** 
     - NEVER run commands to install, download, or update software (e.g., brew, pip, npm, curl, wget) without explicit user permission. 
     If a task requires a new package, ask the user first in a Final Answer.
     
@@ -100,6 +113,7 @@ def get_thin_worker_prompt():
         template=template,
         input_variables=["input", "agent_scratchpad", "tools", "tool_names"],
         partial_variables={
-            "current_date": datetime.now().strftime("%A, %B %d, %Y")
+            "current_date": datetime.now().strftime("%A, %B %d, %Y"),
+            "persistent_memory": persistent_memory
         }
     )
