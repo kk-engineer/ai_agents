@@ -1,5 +1,6 @@
 # Robo Claw
 An AI Agent that responds to queries on your WhatsApp(self) and CLI.
+
 You can run the LLM locally or integrate via API.
 
 # 1. Getting Started (local LLM) 🚀
@@ -30,7 +31,7 @@ aria2c -x 16 -s 16 "https://huggingface.co/bartowski/Mistral-Nemo-Instruct-2407-
 ## Run the model
 *Note*: Run commands in llama.cpp directory
 ```bash
-./build/bin/llama-server \\n-m models/mistral-nemo-12b.gguf \\n--n-gpu-layers -1 \\n--ctx-size 8192 \\n--port 8000
+./build/bin/llama-server -m models/mistral-nemo-12b.gguf --n-gpu-layers -1 --ctx-size 8192 --port 8000
 ```
 *Note*: Downloading the model from internet will take 5-10 mins(depending upon internet speed)
 

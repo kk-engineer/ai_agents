@@ -6,7 +6,12 @@ venv/
 # Environment files
 .env
 
+# Pycache
+__pycache__/
+*.py[cod]
+
 # Databases
+whatsapp_session
 *.sqlite3
 *db*
 db.sqlite3
