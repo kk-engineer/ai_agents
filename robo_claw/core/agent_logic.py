@@ -62,40 +62,48 @@ def call_agent(user_query):
     if decision == "MEMORY":
         messages = chat_manager.get_messages()
 
-        # We isolate the specific pair that needs saving
-        original_user_intent = "Unknown Topic"
-        actual_agent_response = "No data found"
+        # 1. Detection Logic
+        reminder_keywords = ["remind", "reminder", "todo", "appointment"]
+        inquiry_keywords = ["how", "what", "where", "show", "list", "check"]
 
-        if len(messages) >= 2:
-            # The message that provided the facts (last turn)
-            actual_agent_response = messages[-1]['content']
-            # The message that asked for the facts (last turn)
-            original_user_intent = messages[-2]['content']
+        # Check if the user is asking HOW to do something vs TELLING you to remind them
+        is_inquiry = any(user_query.lower().startswith(word) for word in inquiry_keywords)
+        is_reminder_keyword = any(word in user_query.lower() for word in reminder_keywords)
 
-        # 1. Create a focused extraction context
-        focused_context = (
-            f"Question: {original_user_intent}\n"
-            f"Answer: {actual_agent_response}"
-        )
+        if is_reminder_keyword and not is_inquiry:
+            # LOGIC 2: Save as a RAW Reminder
+            formatted_entry = f"REMINDER: {user_query.strip()}"
+            result_message = remember_info(formatted_entry)
+            return result_message
+        else:
+            # LOGIC 1: Save last info (Surgical Extraction)
+            original_user_intent = "Unknown Topic"
+            actual_agent_response = "No data found"
 
-        # 2. Sharpen the extraction prompt to bridge ONLY these two points
-        extraction_prompt = (
-            "TASK: Summarize the following exchange into a single 'Topic: Fact' entry for a permanent log.\n"
-            f"EXCHANGE:\n{focused_context}\n\n"
-            "REQUIREMENTS:\n"
-            "1. The 'Topic' must reflect the Question (e.g., System config).\n"
-            "2. The 'Fact' must contain the specific data from the Answer.\n"
-            "3. Format: [Topic]: [Data]\n"
-            "4. Output ONLY the formatted pair."
-        )
+            if len(messages) >= 2:
+                actual_agent_response = messages[-1]['content']
+                original_user_intent = messages[-2]['content']
 
-        # Invoke LLM to get the actual details
-        extracted_fact = llm.invoke(extraction_prompt).content.strip()
+            focused_context = (
+                f"Question: {original_user_intent}\n"
+                f"Answer: {actual_agent_response}"
+            )
 
-        # Persist to config/memory.md
-        result_message = remember_info(extracted_fact)
+            extraction_prompt = (
+                "TASK: Summarize the following exchange into a single 'Topic: Fact' entry for a permanent log.\n"
+                f"EXCHANGE:\n{focused_context}\n\n"
+                "REQUIREMENTS:\n"
+                "1. The 'Topic' must reflect the Question (e.g., System config).\n"
+                "2. The 'Fact' must contain the specific data from the Answer.\n"
+                "3. Format: [Topic]: [Data]\n"
+                "4. Output ONLY the formatted pair."
+            )
 
-        # Update Chat History
+            # Invoke LLM to bridge the Intent and the Data
+            extracted_fact = llm.invoke(extraction_prompt).content.strip()
+            result_message = remember_info(extracted_fact)
+
+            # Update Chat History
         chat_manager.add_message("user", user_query)
         chat_manager.add_message("assistant", result_message)
         return result_message
@@ -103,7 +111,7 @@ def call_agent(user_query):
     # --- STAGE 3: AGENT CALL (Only if TOOL is needed) ---
     observation = ""
     if decision == "TOOL":
-        current_memory = MemoryManager.read_memory()
+        #current_memory = MemoryManager.read_memory()
         thin_prompt = get_thin_worker_prompt(persistent_memory=current_memory)
 
         thin_agent = create_react_agent(llm, tools, thin_prompt)
