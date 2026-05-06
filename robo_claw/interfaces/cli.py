@@ -1,0 +1,48 @@
+import time
+import os
+from rich.panel import Panel
+from robo_utils.console import get_console
+from core.agent_logic import call_agent
+
+console = get_console()
+
+# CLI Input Loop Logic
+def run_cli():
+    console.print("[bold cyan]💻 CLI Interface: Active. Type your message below:[/bold cyan]")
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+    while True:
+        try:
+            # 1. Colors: Yellow for "You"
+            # 2. Spacing: Added \n before prompt to separate turns
+            user_query = console.input("\n[bold yellow]You:[/bold yellow] ")
+
+            if user_query.lower() in ["exit", "quit"]:
+                break
+            if not user_query.strip():
+                continue
+
+            start_time = time.time()
+
+            # 3. Spinner: dots is more reliable than simpleDots in many terminals
+            with console.status("[magenta]Thinking...", spinner="dots"):
+                output = call_agent(user_query)
+
+            elapsed_time = round(time.time() - start_time, 2)
+
+            # 4. Colors: Green for "RoboSathi"
+            # console.print("\n[bold blue]RoboSathi:[/bold blue]")
+            # console.print(Markdown(output))
+            console.print(Panel(
+                f"[bold yellow]{output}[/bold yellow] ",
+                title="RoboSathi",
+                border_style="blue"
+            ))
+            console.print(f"⏱️ {elapsed_time}s", style="dim")
+            #chat_history.append({"role": "assistant", "content": output})
+
+        except KeyboardInterrupt:
+            console.print("\n[bold cyan]Exiting... Bye for now! See you soon.[/bold cyan]")
+            break
+        except Exception as e:
+            console.print(f"\n[bold red]Error:[/bold red] {str(e)}")
