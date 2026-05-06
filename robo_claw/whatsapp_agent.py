@@ -5,6 +5,7 @@ from neonize.client import NewClient
 from neonize.events import MessageEv, ConnectedEv, event
 from rich.panel import Panel
 from rich.console import Console
+from rich.markdown import Markdown
 from langchain_classic.agents import AgentExecutor, create_react_agent
 from langchain_core.output_parsers import StrOutputParser
 
@@ -18,10 +19,9 @@ from tools.search_duckduckgo import get_duckduckgo_search_tool
 from tools.search_tavily import get_tavily_tool
 from tools.terminal_tool import get_terminal_tool
 
-
 import logging
 # List of noisy loggers to silence
-noisy_loggers = ["httpx", "httpcore", "duckduckgo_search", "whatsmeow"]
+noisy_loggers = ["httpx", "httpcore", "openai", "duckduckgo_search"]
 for logger_name in noisy_loggers:
     logging.getLogger(logger_name).setLevel(logging.WARNING)
 
@@ -154,7 +154,7 @@ def on_message(client: NewClient, event: MessageEv):
             # LOG REPLY TO CLI
             console.print(Panel(
                 f"[bold blue]WhatsApp Out to {sender_jid.User}:[/bold blue] {output}",
-                title="RoboSathi",
+                title="Agent Response",
                 border_style="blue"
             ))
         except Exception as e:
@@ -163,6 +163,10 @@ def on_message(client: NewClient, event: MessageEv):
 # 3. CLI Input Loop Logic
 def run_cli():
     console.print("[bold cyan]💻 CLI Interface: Active. Type your message below:[/bold cyan]")
+    with console.status("[bold green]Loading RoboSathi...", spinner="dots"):
+        agent_executor, llm = initialize_app()
+
+
     os.system('cls' if os.name == 'nt' else 'clear')
 
     while True:
@@ -185,13 +189,8 @@ def run_cli():
             elapsed_time = round(time.time() - start_time, 2)
 
             # 4. Colors: Green for "RoboSathi"
-            # console.print("\n[bold blue]RoboSathi:[/bold blue]")
-            # console.print(Markdown(output))
-            console.print(Panel(
-                f"[bold yellow]{output}[/bold yellow] ",
-                title="RoboSathi",
-                border_style="blue"
-            ))
+            console.print("\n[bold blue]RoboSathi:[/bold blue]")
+            console.print(Markdown(output))
             console.print(f"⏱️ {elapsed_time}s", style="dim")
             chat_history.append({"role": "assistant", "content": output})
 
