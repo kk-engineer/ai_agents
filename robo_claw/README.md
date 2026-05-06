@@ -44,7 +44,7 @@ Will need to fix the prompt accordingly.
 cd /models
 curl -L https://huggingface.co/bartowski/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/main/Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf -o qwen2.5-7b.gguf
 cd ..
-./build/bin/llama-server \\n-m models/qwen2.5-7b.gguf \\n--n-gpu-layers -1 \\n--ctx-size 8192 \\n--port 8000
+./build/bin/llama-server -m models/qwen2.5-7b.gguf --n-gpu-layers -1 --ctx-size 8192 --port 8000
 ```
 2.2 For Ollama (gemma4:e4b model)
 Once Ollama is installed, pull and run the specific version of a model:
