@@ -1,10 +1,8 @@
-# Search Agent
-A simple implementation of Web search + Terminal commands calling agent using local LLM (also online LLM). 
+# Robo Claw
+An AI Agent that responds to queries on your WhatsApp(self) and CLI.
+You can run the LLM locally or integrate via API.
 
-This project focuses on building autonomous systems capable of doing web search when the LLM does not have required information 
-to answer the question or run commands on your Mac terminal to give you information about the system, such as, available free space.
-
-# 1. Getting Started 🚀
+# 1. Getting Started (local LLM) 🚀
 1.1 Use llama.cpp (Preferred, as faster on Mac)
 ```bash
 brew install cmake
@@ -62,7 +60,7 @@ In case your system has lower RAM then - you can use smaller model, such as, "qw
 ```bash
 # Clone the repository
 git clone https://github.com/kk-engineer/ai_agents.git
-cd ai_agents/search_agent
+cd ai_agents/robo_claw
 
 # Create a virtual environment
 python -m venv .venv
@@ -72,8 +70,8 @@ source .venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-# 4. Run Streamlit App
+# 4. Run the App
 ``` bash
-streamlit run app.py
+python3 app.py
 ```
 
