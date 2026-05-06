@@ -5,6 +5,10 @@ import logging
 from interfaces.cli import run_cli
 from interfaces.whatsapp import get_whatsApp_client
 
+from langchain_core.globals import set_debug
+
+#set_debug(True)
+
 # List of noisy loggers to silence
 noisy_loggers = ["httpx", "httpcore", "duckduckgo_search", "whatsmeow"]
 for logger_name in noisy_loggers:
@@ -21,7 +25,6 @@ def main():
 
     # Start CLI in the foreground
     run_cli()
-
 
 if __name__ == "__main__":
     main()

@@ -2,7 +2,7 @@ import time
 import os
 from rich.panel import Panel
 from robo_utils.console import get_console
-from core.agent_logic import call_agent
+from core.agent_logic import call_agent, clear_chat_history
 
 console = get_console()
 
@@ -22,6 +22,14 @@ def run_cli():
             if not user_query.strip():
                 continue
 
+            # --- CLEAR COMMAND LOGIC ---
+            if user_query.lower() in ["clear", "/clear"]:
+                clear_chat_history()
+                os.system('cls' if os.name == 'nt' else 'clear')
+                console.print("[bold green]✨ Chat history cleared![/bold green]")
+                continue
+            # -------------------------------
+
             start_time = time.time()
 
             # 3. Spinner: dots is more reliable than simpleDots in many terminals
@@ -30,11 +38,8 @@ def run_cli():
 
             elapsed_time = round(time.time() - start_time, 2)
 
-            # 4. Colors: Green for "RoboSathi"
-            # console.print("\n[bold blue]RoboSathi:[/bold blue]")
-            # console.print(Markdown(output))
             console.print(Panel(
-                f"[bold yellow]{output}[/bold yellow] ",
+                f"[bold white]{output}[/bold white] ",
                 title="RoboSathi",
                 border_style="blue"
             ))
