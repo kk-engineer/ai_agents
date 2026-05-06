@@ -2,9 +2,11 @@ import time
 import os
 from rich.panel import Panel
 from robo_utils.console import get_console
+import robo_utils.spinner   # Add new spinner for progress status
 from core.agent_logic import call_agent, clear_chat_history
 
 console = get_console()
+
 
 # CLI Input Loop Logic
 def run_cli():
@@ -33,7 +35,8 @@ def run_cli():
             start_time = time.time()
 
             # 3. Spinner: dots is more reliable than simpleDots in many terminals
-            with console.status("[magenta]Thinking...", spinner="dots"):
+            #with console.status("[magenta]Thinking...", spinner="dots"):
+            with console.status("[magenta]Thinking...", spinner="progress_bar"):
                 output = call_agent(user_query)
 
             elapsed_time = round(time.time() - start_time, 2)

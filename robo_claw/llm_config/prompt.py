@@ -51,13 +51,19 @@ def get_synthesis_prompt():
 # Check if simple prompt and does not need agent for execution
 def get_simple_prompt():
     simple_prompt = ChatPromptTemplate.from_template(
-        "Analyze the user input and categorize it into ONE of two categories:\n\n"
-        "1. SIMPLE: Greetings, identity questions, gratitude, or general knowledge that "
-        "DOES NOT require searching the web or checking the local system/terminal.\n"
-        "2. TOOL: Requests that require current weather, news, web searches, "
-        "running terminal commands, checking system specs, or file operations.\n\n"
-        "User Input: {text}\n\n"
-        "Respond with ONLY the word 'SIMPLE' or 'TOOL'."
+        "### INSTRUCTION\n"
+        "Categorize the User Input as 'SIMPLE' or 'TOOL' based on the following safety guardrails.\n\n"
+        "### GUARDRAIL 1: DATA FRESHNESS\n"
+        "If the input mentions system configuration, weather, or time-sensitive facts (latest, update, news etc.), "
+        "you MUST respond 'TOOL'. Your internal training data is considered STALE for these topics.\n\n"
+        "### GUARDRAIL 2: THE HALLUCINATION TRAP\n"
+        "If the user asks 'What is my [X]?', you DO NOT know the answer. Even if it is in your context, "
+        "you MUST select 'TOOL' to verify the current state. Do not rely on static summaries.\n\n"
+        "### GUARDRAIL 3: COMPLEXITY\n"
+        "Categorize as 'SIMPLE' if the response is a social convention, a greeting, "
+        "or a request for a static definition (e.g., 'What is a variable?').\n\n"
+        "User Input: {text}\n"
+        "Response (ONLY 'SIMPLE' or 'TOOL'):"
     )
     return simple_prompt
 
@@ -80,12 +86,12 @@ def get_thin_worker_prompt():
     Final Answer: A detailed answer based EXACTLY on the Observation.
     
     STRICT RULES:
-    1. 1. **INSTALLATION LOCK:** NEVER run commands to install, download, or update software (e.g., brew, pip, npm, curl, wget) without explicit user permission. 
-    If a task requires a new package, ask the user first in a Final Answer.
-    2. For system configuration run this multi-command in one action:
+    1. For terminal tool system configuration, run this multi-command in one action:
     sw_vers -productVersion; system_profiler SPHardwareDataType | grep -E "Model Name|Chip|Memory"; system_profiler SPDisplaysDataType | grep "Chipset Model"; df -H /System/Volumes/Data | head -n 2; 
     system_profiler SPHardwareDataType | grep -E "Total Number of Cores"; system_profiler SPDisplaysDataType | grep -E "Total Number of Cores"
-
+    2. **INSTALLATION LOCK:** 
+    - NEVER run commands to install, download, or update software (e.g., brew, pip, npm, curl, wget) without explicit user permission. 
+    If a task requires a new package, ask the user first in a Final Answer.
     
     Question: {input}
     Thought: {agent_scratchpad}"""
