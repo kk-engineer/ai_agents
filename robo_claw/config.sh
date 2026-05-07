@@ -1,1 +1,0 @@
-sw_vers -productVersion && system_profiler SPHardwareDataType | grep -E \"Model Name|Chip|Memory\" && system_profiler SPDisplaysDataType | grep \"Chipset Model\" && df -H /System/Volumes/Data | head -n 2 && system_profiler SPHardwareDataType | grep -E \"Total Number of Cores\" && system_profiler SPDisplaysDataType | grep -E \"Total Number of Cores\"

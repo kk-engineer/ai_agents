@@ -1,17 +1,53 @@
-# Virtual Environments
-.venv/
-.idea/
-venv/
-
-# Environment files
-.env
-
-# Pycache
+# --- Python Artifacts ---
 __pycache__/
 *.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/      # <--- This is the one you asked about
+.installed.cfg
+*.egg
+MANIFEST
 
-# Databases
+# --- Virtual Environments ---
+.venv/
+venv/
+ENV/
+env/
+
+# --- Environment Secrets (CRITICAL) ---
+.env
+.env.local
+.env.*
+secrets.json
+
+# --- AI/LLM Specific ---
+.langchain/
+.langgraph/
+.cache/
+data/           # Ignore local databases/vector stores
+*.log           # Ignore agent logs
+
+# --- macOS Specific ---
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+
+# -- DB & Whatsapp
 whatsapp_session
-*.sqlite3
-*db*
-db.sqlite3
+*.db
+sqlite*
