@@ -17,7 +17,7 @@ sdist/
 var/
 wheels/
 share/python-wheels/
-*.egg-info/      # <--- This is the one you asked about
+*.egg-info/
 .installed.cfg
 *.egg
 MANIFEST
@@ -51,3 +51,10 @@ Icon
 whatsapp_session
 *.db
 sqlite*
+
+# --- IDEs ---
+.idea/
+.vscode/
+*.swp
+*.swo
+
