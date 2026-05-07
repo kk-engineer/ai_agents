@@ -1,7 +1,8 @@
-from neonize.client import NewClient
-from neonize.events import MessageEv, ConnectedEv, event
-from rich.panel import Panel
 import time
+
+from neonize.client import NewClient
+from neonize.events import MessageEv, ConnectedEv
+from rich.panel import Panel
 
 # Local imports
 from common.common_utils.console import get_console
@@ -9,84 +10,232 @@ from common.core.agent_logic import call_agent
 
 console = get_console()
 
-# WhatsApp Logic
-# 'database' parameter ensures QR scan is only needed once
-# Pass the session name first; Neonize uses this to create the .db file automatically
+# -----------------------------------
+# WHATSAPP CLIENT
+# -----------------------------------
+
 client = NewClient("whatsapp_session")
+
 
 def get_whatsApp_client():
     return client
 
-# Agent call logic here
+
+# -----------------------------------
+# RUNTIME SELF ID
+# -----------------------------------
+
+SELF_ID = None
+
+# Prevent infinite loops
+last_sent_response = ""
+
+
+# -----------------------------------
+# CONNECTED EVENT
+# -----------------------------------
+
 @client.event(ConnectedEv)
 def on_connected(client: NewClient, event: ConnectedEv):
-    console.print("[bold green]✅ WhatsApp Interface: Connected & Online[/bold green]")
 
-# Initialize a global variable for loop protection
-last_sent_response = ""
+    console.print(
+        "[bold green]✅ WhatsApp Interface Connected[/bold green]"
+    )
+
+
+# -----------------------------------
+# MESSAGE EVENT
+# -----------------------------------
 
 @client.event(MessageEv)
 def on_message(client: NewClient, event: MessageEv):
-    start_time = time.time()
+
+    global SELF_ID
     global last_sent_response
-    info = event.Info
 
-    # 1. FILTER: Ignore all Group messages
-    is_group = getattr(info, "IsGroup", getattr(info, "isGroup", False))
-    if is_group:
-        return
+    start_time = time.time()
 
-    # 2. DEFINE JID & FILTER: Identify "Self-Chat"
-    # Assign sender_jid from the message source to fix the NameError
-    sender_jid = info.MessageSource.Chat
-    chat_user = sender_jid.User
-    sender_user = info.MessageSource.Sender.User
+    try:
 
-    # Only respond if you are messaging yourself (Notes to Self)
-    if chat_user != sender_user:
-        return
+        info = event.Info
+        source = info.MessageSource
 
-    # 3. TEXT EXTRACTION
-    user_text = ""
-    if event.Message.conversation:
-        user_text = event.Message.conversation
-    elif event.Message.extendedTextMessage and event.Message.extendedTextMessage.text:
-        user_text = event.Message.extendedTextMessage.text
+        # -----------------------------------
+        # IGNORE GROUPS
+        # -----------------------------------
 
-    # 4. LOOP PROTECTION
-    # If the incoming text is exactly what the bot just sent, ignore it.
-    if not user_text or user_text == last_sent_response:
-        return
+        is_group = getattr(
+            info,
+            "IsGroup",
+            getattr(info, "isGroup", False)
+        )
 
-    # 5 EXECUTION
-    user_text = ""
-    if event.Message.conversation:
-        user_text = event.Message.conversation
-    elif event.Message.extendedTextMessage and event.Message.extendedTextMessage.text:
-        user_text = event.Message.extendedTextMessage.text
+        if is_group:
+            return
 
-    if user_text:
-        # LOG TO CLI
-        console.print(Panel(
-            f"[bold green]WhatsApp In ({sender_jid.User}):[/bold green] {user_text}",
-            title="WhatsApp Message",
-            border_style="green"
-        ))
+        # -----------------------------------
+        # EXTRACT IDS
+        # -----------------------------------
 
-        try:
-            output = call_agent(user_text)
+        chat_user = str(
+            getattr(source.Chat, "User", "")
+        )
 
-            # Reply via WhatsApp
-            client.send_message(sender_jid, output)
+        sender_user = str(
+            getattr(source.Sender, "User", "")
+        )
 
-            # LOG REPLY TO CLI
-            console.print(Panel(
-                f"[bold blue]WhatsApp Out to {sender_jid.User}:[/bold blue] {output}",
+        from_me = getattr(
+            info,
+            "FromMe",
+            getattr(info, "fromMe", False)
+        )
+
+        # -----------------------------------
+        # LEARN SELF ID AUTOMATICALLY
+        # -----------------------------------
+
+        # Self-chat uniquely satisfies:
+        # chat_user == sender_user
+
+        if SELF_ID is None:
+
+            if (
+                chat_user
+                and sender_user
+                and chat_user == sender_user
+            ):
+
+                SELF_ID = chat_user
+
+                console.print(
+                    f"[bold cyan]Learned SELF_ID:[/bold cyan] {SELF_ID}"
+                )
+
+        # -----------------------------------
+        # DEBUG LOGS
+        # -----------------------------------
+
+        # console.print({
+        #     "chat_user": chat_user,
+        #     "sender_user": sender_user,
+        #     "from_me": from_me,
+        #     "SELF_ID": SELF_ID,
+        # })
+
+        # -----------------------------------
+        # IGNORE UNTIL SELF_ID FOUND
+        # -----------------------------------
+
+        if SELF_ID is None:
+            return
+
+        # -----------------------------------
+        # ONLY RESPOND TO SELF CHAT
+        # -----------------------------------
+
+        is_self_chat = (
+            chat_user == SELF_ID
+            and sender_user == SELF_ID
+        )
+
+        if not is_self_chat:
+            return
+
+        # -----------------------------------
+        # EXTRACT TEXT
+        # -----------------------------------
+
+        user_text = ""
+
+        if getattr(event.Message, "conversation", None):
+            user_text = event.Message.conversation
+
+        elif (
+            getattr(
+                event.Message,
+                "extendedTextMessage",
+                None
+            )
+            and event.Message.extendedTextMessage.text
+        ):
+            user_text = (
+                event.Message
+                .extendedTextMessage
+                .text
+            )
+
+        user_text = user_text.strip()
+
+        if not user_text:
+            return
+
+        # -----------------------------------
+        # LOOP PROTECTION
+        # -----------------------------------
+
+        if user_text == last_sent_response:
+            return
+
+        # -----------------------------------
+        # LOG INPUT
+        # -----------------------------------
+
+        console.print(
+            Panel(
+                f"[bold green]WhatsApp In:[/bold green] {user_text}",
+                title="WhatsApp Message",
+                border_style="green",
+            )
+        )
+
+        # -----------------------------------
+        # CALL AGENT
+        # -----------------------------------
+
+        output = call_agent(user_text)
+
+        if not output:
+            return
+
+        output = str(output).strip()
+
+        # Save before sending
+        last_sent_response = output
+
+        # -----------------------------------
+        # SEND REPLY
+        # -----------------------------------
+
+        client.send_message(
+            source.Chat,
+            output
+        )
+
+        # -----------------------------------
+        # LOG OUTPUT
+        # -----------------------------------
+
+        console.print(
+            Panel(
+                f"[bold blue]WhatsApp Out:[/bold blue] {output}",
                 title="RoboSathi",
-                border_style="blue"
-            ))
-            elapsed_time = round(time.time() - start_time, 2)
-            console.print(f"⏱️ {elapsed_time}s", style="dim")
+                border_style="blue",
+            )
+        )
 
-        except Exception as e:
-            console.print(f"[bold red]Error in WhatsApp Agent: {e}[/bold red]")
+        elapsed_time = round(
+            time.time() - start_time,
+            2
+        )
+
+        console.print(
+            f"⏱️ {elapsed_time}s",
+            style="dim"
+        )
+
+    except Exception as e:
+
+        console.print(
+            f"[bold red]WhatsApp Error:[/bold red] {e}"
+        )

@@ -1,18 +1,19 @@
+import json
+
 from langchain_classic.agents import AgentExecutor, create_react_agent
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.tools import Tool
 
+from common.common_utils.memory_utils import get_relevant_memory, update_memory
+from common.core.pre_process import has_relevant_memory, is_memory_save_request
 # Local imports
 from common.llm_config.local_llama_cpp import get_local_llama_llm
 from common.llm_config.online_llm import get_cloud_llm
 from common.tools.search_duckduckgo import get_duckduckgo_search_tool
 from common.tools.search_tavily import get_tavily_tool
 from common.tools.terminal_tool import get_terminal_tool
-from common.tools.memory_tool import remember_info
-
 from common.common_utils.chat_manager import get_chat_manager
 from common.common_utils.clean_tool_output import clean_web_search_output, clean_terminal_output
-from common.common_utils.memory import MemoryManager
 from common.llm_config.prompt import get_synthesis_prompt, get_thin_worker_prompt, get_simple_prompt
 
 USE_LOCAL_LLAMA_CPP_LLM = True
@@ -39,11 +40,6 @@ def get_tools():
             name="web_search",
             func=lambda q: clean_web_search_output(raw_web_search.run(q)),
             description="Search the web for general knowledge, news, and weather."
-        ),
-        Tool(
-            name="remember_info",
-            func=remember_info,
-            description="MANDATORY for saving facts. Use when the user says 'remember this' or 'save to memory'."
         )
     ]
 
@@ -51,79 +47,57 @@ def get_tools():
 def call_agent(user_query):
     llm = get_llm()
     tools = get_tools()
+    memory_hit = has_relevant_memory(user_query)
 
-    # --- STAGE 1: THE INTEGRATED ROUTER ---
-    # PRE-FETCH Memory for the Router
-    current_memory = MemoryManager.read_memory()
-    router_chain = get_simple_prompt(persistent_memory=current_memory) | llm | StrOutputParser()
-    decision = router_chain.invoke({"text": user_query}).strip().upper()
+    if memory_hit:
+        #print("Info already present in memory; No need to call agent!")
+        return memory_hit["value"]
 
-    # --- STAGE 2: FAST-TRACK MEMORY (Bypass Agent & Synthesis) ---
-    if decision == "MEMORY":
+    # Check for save to memory request
+    if is_memory_save_request(user_query):
         messages = chat_manager.get_messages()
+        result_message = update_memory(messages,current_query=user_query)
 
-        # 1. Detection Logic
-        reminder_keywords = ["remind", "reminder", "todo", "appointment"]
-        inquiry_keywords = ["how", "what", "where", "show", "list", "check"]
-
-        # Check if the user is asking HOW to do something vs TELLING you to remind them
-        is_inquiry = any(user_query.lower().startswith(word) for word in inquiry_keywords)
-        is_reminder_keyword = any(word in user_query.lower() for word in reminder_keywords)
-
-        if is_reminder_keyword and not is_inquiry:
-            # LOGIC 2: Save as a RAW Reminder
-            formatted_entry = f"REMINDER: {user_query.strip()}"
-            result_message = remember_info(formatted_entry)
-            return result_message
-        else:
-            # LOGIC 1: Save last info (Surgical Extraction)
-            original_user_intent = "Unknown Topic"
-            actual_agent_response = "No data found"
-
-            if len(messages) >= 2:
-                actual_agent_response = messages[-1]['content']
-                original_user_intent = messages[-2]['content']
-
-            focused_context = (
-                f"Question: {original_user_intent}\n"
-                f"Answer: {actual_agent_response}"
-            )
-
-            extraction_prompt = (
-                "TASK: Summarize the following exchange into a single 'Topic: Fact' entry for a permanent log.\n"
-                f"EXCHANGE:\n{focused_context}\n\n"
-                "REQUIREMENTS:\n"
-                "1. The 'Topic' must reflect the Question (e.g., System config).\n"
-                "2. The 'Fact' must contain the specific data from the Answer.\n"
-                "3. Format: [Topic]: [Data]\n"
-                "4. Output ONLY the formatted pair."
-            )
-
-            # Invoke LLM to bridge the Intent and the Data
-            extracted_fact = llm.invoke(extraction_prompt).content.strip()
-            result_message = remember_info(extracted_fact)
-
-            # Update Chat History
         chat_manager.add_message("user", user_query)
         chat_manager.add_message("assistant", result_message)
+
         return result_message
 
-    # --- STAGE 3: AGENT CALL (Only if TOOL is needed) ---
-    observation = ""
-    if decision == "TOOL":
-        #current_memory = MemoryManager.read_memory()
-        thin_prompt = get_thin_worker_prompt(persistent_memory=current_memory)
+    # --- STAGE 1: THE INTEGRATED ROUTER ---
+    router_chain = get_simple_prompt() | llm | StrOutputParser()
+    decision = router_chain.invoke({
+        "input": user_query,
+        "chat_history": chat_manager.get_as_string()
+    }).strip()
+    #print(decision)
 
-        thin_agent = create_react_agent(llm, tools, thin_prompt)
+    if decision.startswith("SIMPLE"):
+        # Extract the response and print it directly
+        final_text = decision.split("|")[1].strip()
+        return final_text # Stop here! No second LLM call needed.
+
+    # --- AGENT CALL (Only if TOOL is needed) ---
+    observation = ""
+    if decision.startswith("TOOL"):
+        thin_prompt = get_thin_worker_prompt()
+
+        # Create ReAct LLM
+        react_llm = llm.bind(
+            stop=["Observation:"]
+        )
+
+        thin_agent = create_react_agent(react_llm, tools, thin_prompt)
         executor = AgentExecutor(
             agent=thin_agent,
             tools=tools,
             handle_parsing_errors=True,
-            max_iterations=2,  # Critical for 16GB RAM limit
+            max_iterations=3,
             verbose=True
         )
 
-        worker_result = executor.invoke({"input": user_query})
+        worker_result = executor.invoke(
+            {"input": user_query,
+         })
         observation = worker_result["output"]
 
     # --- STAGE 4: DIRECT SYNTHESIS (Persona Delivery) ---
@@ -133,8 +107,7 @@ def call_agent(user_query):
     final_output = synthesis_chain.invoke({
         "input": user_query,
         "observation": observation,
-        "chat_history": chat_manager.get_as_string(),
-        "persistent_memory": MemoryManager.read_memory()
+        "chat_history": chat_manager.get_as_string()
     })
 
     # Update History for next turn
